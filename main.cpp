@@ -22,6 +22,6 @@ int main() {
       visu.draw_graph(image.get_crop(0,y,0,2,image.width()-1,y,0,2),blue,1,1,0,255,0).display(draw_disp);
     }
   }
-  //cout<<"Hello World!"<<endl;
+  cout<<"Hello World!"<<endl;
   return 0;
 }
