@@ -10,7 +10,10 @@ class Pima
 	  CImg<unsigned char> srcToFillRGB;
 	  CImg<double> imageXYZ; 
 	  CImg<double> imageLab;
-	  CImg<bool> imagehole;
+	  CImg<bool> target_region;
+	  CImg<bool> source_region;
+	  CImg<bool> fill_front;
+	  int size_dilate;
      
      
      public:
@@ -18,28 +21,66 @@ class Pima
 	  Pima() : srcFullRGB(),srcToFillRGB() {}
 	  ~Pima() {}
 
-	       Pima(const char * fileIN1,const char * fileIN2) : srcFullRGB(), srcToFillRGB()
+	  Pima(const char * _srcFullRGB,const char * _srcToFillRGB, int _size_dilate=25) : srcFullRGB(), srcToFillRGB(), size_dilate()
 	  {	
-	       //initialisation des parametres
-	       CImg<unsigned char> tmp1(fileIN1);
-	       CImg<unsigned char> tmp2(fileIN2);
+	       //initialisation 
+	       CImg<unsigned char> tmp1(_srcFullRGB);
+	       CImg<unsigned char> tmp2(_srcToFillRGB);
+	       CImg<bool> tmp3;
+	       
 	       srcFullRGB=tmp1;
 	       srcToFillRGB=tmp2;
+	       size_dilate=_size_dilate;
+	       
+	       //Conversion RGB to CieLAB
 	       imageXYZ=srcFullRGB.get_RGBtoXYZ(); 
 	       imageLab=imageXYZ.get_XYZtoLab();
+
+	       //Initialisation of target_region
+	       target_region=(srcFullRGB-srcToFillRGB);
 	       
-	       //Remplissage de imagehole
-	       imagehole=(srcFullRGB-srcToFillRGB);
+	       //Initialisation of source_region
+	       tmp3=target_region;
+	       tmp3.dilate(size_dilate,size_dilate);
+	       source_region=tmp3-target_region;
+	       
+	       //Initialisation of fill_front
+	       fill_front=define_fillfront();
+	       
 	       
 	       //Display
-	       CImgDisplay main_disp1_0(srcFullRGB,"Image RGB"),
-	       main_disp1_1(srcToFillRGB,"Image RGB"),
-	       main_disp1_3(imagehole,"Image Hole");
-	       //main_disp2(imageXYZ,"Image XYZ"),
-	       //main_disp3(imageLab,"Image Lab");
-	       while (!main_disp1_0.is_closed()) {main_disp1_0.wait();}
+	       //my_display();
 	       
 	  }
+	  
+	  //update source_region & target_region
+	  void update_region_to_fill()
+	  {
+	       
+	  }
+	  
+	  
+	  
+	  void my_display()
+	  {
+	       CImgDisplay 
+	       main_disp1_0(srcFullRGB    , "Image source full"),
+	       main_disp1_1(srcToFillRGB  , "Image source to fill"),
+	       main_disp1_3(target_region , "Target Region"),
+	       main_disp1_4(source_region , "Source Region"),
+	       main_disp1_5(fill_front    , "Fill Front");
+	       
+	       while (!main_disp1_0.is_closed()) {main_disp1_0.wait();} 
+	  }
+	  
+	  CImg<bool> define_fillfront()
+	  {
+	       CImg<bool> tmp(target_region);
+	       CImg<bool> res(target_region-tmp.erode(3,3));
+	       return res;	       
+	  }
+	  
+	  	  
 };
 
 #endif
