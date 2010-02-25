@@ -7,9 +7,11 @@ class Pima
 {
      protected:
 	  CImg<unsigned char> srcFullRGB;
-	  CImg<unsigned char> srcToFillRGB;
+	  CImg<unsigned char> srcFullCIE;
+	  CImg<unsigned char> srcToFillCIE;  
+	  CImg<unsigned char> srcToFillRGB;	       
+	 
 	  CImg<double> imageXYZ; 
-	  CImg<double> imageLab;
 	  CImg<bool> target_region;
 	  CImg<bool> source_region;
 	  CImg<bool> fill_front;
@@ -30,11 +32,17 @@ class Pima
 	       srcFullRGB(), srcToFillRGB(), size_dilate(), size_patch(), alpha()
 	  {	
 	       //initialisation 
+	       
 	       CImg<unsigned char> tmp1(_srcFullRGB);
 	       CImg<unsigned char> tmp2(_srcToFillRGB);
-	       CImg<bool> tmp3;
-	       CImg<float> tmp4(tmp1.width(),tmp1.height(),1);
-	       tmp4.fill(0);
+	       double W=tmp1.width(),H=tmp1.height();
+	       CImg<bool> tmp3(W,H,1);
+	       tmp3.fill(0);
+	       CImg<float> tmp4(W,H,1);
+	       tmp4.fill(0.0);
+	       CImg<bool> tmp5(W,H,1);
+	       tmp5.fill(0);
+	       
 	       
 	       srcFullRGB=tmp1;
 	       srcToFillRGB=tmp2;
@@ -43,8 +51,10 @@ class Pima
 	       alpha=_alpha;
 	       
 	       //Conversion RGB to CieLAB
-	       imageXYZ=srcFullRGB.get_RGBtoXYZ(); 
-	       imageLab=imageXYZ.get_XYZtoLab();
+// 	       imageXYZ=srcFullRGB.get_RGBtoXYZ(); 
+// 	       srcFullCIE =imageXYZ.get_XYZtoLab();
+	       imageXYZ=srcToFillRGB.get_RGBtoXYZ();
+	       srcToFillCIE=imageXYZ.get_XYZtoLab();
 
 	       //Initialisation of target_region
 	       target_region=(srcFullRGB-srcToFillRGB);
@@ -55,63 +65,86 @@ class Pima
 	       
 	       //Initialisation of source_region
 	       tmp3=target_region;
-	       tmp3.dilate(size_dilate,size_dilate);
-	       source_region=tmp3-target_region;
+	       source_region=tmp3.dilate(size_dilate,size_dilate)-target_region;
 	       
 	       //Initialisation of fill_front
-	       fill_front=define_fillfront();
+	       tmp5=target_region;
+	       fill_front=target_region-tmp5.erode(3,3);
 	       
-	      
-	       
-	             
 	       //ALGO
 	       run();
 	  }
 	  
-	  //update source_region & target_region
-	  void update_region_to_fill()
-	  {
-	       
-	  }
+	
 	  
 	  
 	  
 	  void my_display()
 	  {
 	       CImgDisplay 
-	       main_disp1_0(srcFullRGB    , "Image source full"),
-	       main_disp1_1(srcToFillRGB  , "Image source to fill");
-// 	       main_disp1_3(target_region , "Target Region"),
-// 	       main_disp1_4(source_region , "Source Region"),
-// 	       main_disp1_5(fill_front    , "Fill Front"),
-// 	       main_disp1_6(CP            , "CP");
+	      // main_disp1_0(srcFullRGB    , "Image source full"),
+	       main_disp1_1(srcToFillRGB , "Image source to fill");
+	       /*main_disp1_3(target_region , "Target Region");
+	       main_disp1_4(source_region , "Source Region"),
+	       main_disp1_5(fill_front    , "Fill Front"),
+	       main_disp1_6(CP            , "CP");*/
 	       
-	       while (!main_disp1_0.is_closed()) {main_disp1_0.wait();} 
+	       while (!main_disp1_1.is_closed()) {main_disp1_1.wait();} 
 	  }
 	  
-	  CImg<bool> define_fillfront()
+	  void update_fillfront()
 	  {
 	       CImg<bool> tmp(target_region);
-	       CImg<bool> res(target_region-tmp.erode(3,3));
-	       return res;	       
+	       fill_front=(target_region-tmp.erode(3,3));
+	       	       
 	  }
 	  
+	  void update_sourceregion()
+	  {
+	       CImg<bool> tmp(target_region);
+	       source_region=tmp.dilate(size_dilate,size_dilate)-target_region;
+	       	       
+	  }
+	  
+	  void update_targetregion(CImg<unsigned char>  *Prec)
+	  {
+	       
+	       CImg<bool> tmp(target_region);
+	       tmp.fill(0);
+	       tmp=srcToFillRGB-*Prec;
+	       target_region-=tmp;
+	       
+	       //target_region-=(srcToFillRGB-*Prec);
+	  }
+	  
+  
 	  void run()
 	  {
-	       int x(0),y(0);
-	       //fill_front=define_fillfront();
-	       //while fill_front!= 0;
-		    calculate_Pp();
+	       int IPS(0),JPS(0),IS(0),JS(0);
+	       CImg<unsigned char> SRC_prec(srcToFillRGB);
+	      
+	      while(!target_region.is_empty())
+	      {
+	      // for(int d=0;d<3;d++){
+	       
+		    calculate_Pp();//OK
+		    get_maxPatch(&IPS,&JPS);//OK
+		    find_exemplar_Patch(IPS,JPS,&IS,&JS);//ok
+		    cout<<"to print ("<<IPS<<","<<JPS<<")"<<endl;
+		    cout<<"to choose ("<<IS<<","<<JS<<")"<<endl;cout<<""<<endl;
+		    SRC_prec=srcToFillRGB;
+		    fill_patch(IPS,JPS,IS,JS);
 		    
-		    
-		    //Find Max_Patch
-		    get_maxPatch(&x,&y);
-		    //Find de examplar_patch
-		    //Copy Patch
-		    //update C(p)
-	       //endwhile
-	       my_display();
+		    update_targetregion(&SRC_prec);
+		    update_fillfront();
+		    update_sourceregion();
+		    		 
+		    my_display();
+	       //}
+	      }
 	  }
+	  
+	  
 	  
 	  void calculate_Pp()
 	  {
@@ -142,9 +175,8 @@ class Pima
 	       }    
 	  }
 	  
-	  void get_maxPatch(int * x,int *y)
+	  void get_maxPatch(int *x,int *y)
 	  {
-	       const unsigned char red[] ={255,0,0};
 	       float tmp(0.0);
 	       cimg_forXY(PP,a,b)
 	       {
@@ -155,17 +187,84 @@ class Pima
 			 *y=b;
 		    }
 	       }
-	       cout<<"to print ("<<*x<<","<<*y<<")"<<endl;
-	       srcToFillRGB.draw_circle(*x,*y,20,red,3,5);
+	       
+	       
 	  }
 	  
 	  
-	  void calculate_Dp()
+	  void calculate_Dp() //TODO: toute la fonction!!
 	  {
 	        DP.fill(1.0);
 	  }
 	  
-	  	  
+	  //(i,j) coordonates of the center of the patch to fill
+	  //(ii,jj) coordonates of the center of the patch to find in the source_region
+	  float compare_patch(const int i,const int j,const int ii,const int jj)
+	  {
+	       
+	       float res(0.0);
+	       int f=floor(size_patch/2);
+	       for(int z=-f;z<f+1;z++)
+		    for(int t=-f;t<f+1;t++)
+		    {
+			 if ((source_region(ii+t,jj+z)!=0)&&(target_region(i+t,j+z)!=0))
+			 {
+			      res+=(((srcToFillCIE(i+t,j+z,0,0)-srcToFillCIE(ii+t,jj+z,0,0))^2)+
+				    ((srcToFillCIE(i+t,j+z,0,1)-srcToFillCIE(ii+t,jj+z,0,1))^2)+
+				    ((srcToFillCIE(i+t,j+z,0,2)-srcToFillCIE(ii+t,jj+z,0,2))^2));
+			      
+			 }
+		    }
+	       return res;
+	      
+	  }
+	  
+	  void fill_patch(const int & IPS,const int & JPS,const int & IS,const int & JS)
+	  {	
+	       //(IPS,JPS) : Coordonates of the higher priority front_fill pixel
+	       //(IS,JS)   : Coordonates of the center of the exemplar patch to find in source_region
+	       int f=floor(size_patch/2);
+	       for(int z=-f;z<f+1;z++)
+		    for(int t=-f;t<f+1;t++)
+		    {
+			 if((source_region(IS+t,JS+z) !=0)&&(target_region(IPS+t,JPS+z)!=0))//all pixels must be filled in the regions
+			 {
+			      srcToFillRGB(IPS+t,JPS+z)=srcToFillRGB(IS+t,JS+z);
+			     /*
+			      srcToFillRGB(IPS+t,JPS+z,0,0)=srcToFillRGB(IS+t,JS+z,0,0);
+			      srcToFillRGB(IPS+t,JPS+z,0,1)=srcToFillRGB(IS+t,JS+z,0,1);
+			      srcToFillRGB(IPS+t,JPS+z,0,2)=srcToFillRGB(IS+t,JS+z,0,2);
+			      */
+			 }
+		    }
+	  }
+	  
+	  
+	  
+	  void find_exemplar_Patch(int IPS,int JPS,int * IS, int *JS)
+	  {
+	       double TMP(0.0), SSD(10000.0);
+	       int f=floor(size_patch/2);
+	       //cout<<"Taille_image : ("<<source_region.width()<<","<<source_region.height()<<")"<<endl;
+	       cimg_forXY(source_region,a,b)
+	       {
+		    if(source_region(a,b) != 0)
+		    {			 
+			 if ((a>f-1) && (a<source_region.width()-f)
+			     && (b>f-1) && (b<source_region.height()-f))
+			 {
+			      TMP=compare_patch(IPS,JPS, a, b);
+			      if(TMP<SSD)
+			      {
+				   SSD=TMP;
+				   *IS=a;
+				   *JS=b;
+			      }
+			 }
+		    }
+	       }
+	  }
+	  
 };
 
 #endif
