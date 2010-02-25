@@ -2,7 +2,7 @@
 
 int main(int argc, char** argv ) {
     
-     Pima(argv[1],argv[2],30);
+     Pima(argv[1],argv[2],20);
      	  
      return 0;
 }
