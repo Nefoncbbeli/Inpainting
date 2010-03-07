@@ -3,10 +3,10 @@
 
 
 
-int main(int argc, char** argv ) {
+int main(int argc, char** argv ) 
+{
      
+     Pima(argv[1],argv[2],20,9);
      
-     Pima(argv[1],argv[2],18);
-     	  
      return 0;
 }
