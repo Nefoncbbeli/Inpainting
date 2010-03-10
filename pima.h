@@ -57,7 +57,6 @@ class Pima
 
                //Initialisation of target_region
 	       cimg_forXY(srcFullRGB,g,h){
-			 //if (srcFullRGB(g,h)!=srcToFillRGB(g,h))
 			 if ((srcFullRGB(g,h,0)!=srcToFillRGB(g,h,0))||
 			     (srcFullRGB(g,h,1)!=srcToFillRGB(g,h,1))||
 			     (srcFullRGB(g,h,2)!=srcToFillRGB(g,h,2)))
@@ -112,39 +111,52 @@ class Pima
 	      my_display();
           }
           
-          void update_Pp(double _IPS,double _JPS,double _Cprec)
-          {
-               PP.fill(0.0);
-               update_Cp(_IPS,_JPS,_Cprec);
-               calculate_Dp();
-               cimg_forXY(PP,x,y)
-	       {
-                    //PP(x,y)=DP(x,y);
-                    PP(x,y)=CP(x,y);
-		    //PP(x,y)=DP(x,y)*CP(x,y)/pow(256,3);//TODO pb calcul DP & normalisation
-		    
-		    //if (PP(x,y)!=0)
-			//cout<<"DP,CP "<<DP(x,y)<<" "<<CP(x,y)<<endl;	
-	       }
-          }
-	  
-	   void initialize_Pp()
+	  void initialize_Pp()
           {
                PP.fill(0.0);
                calculate_Dp();
 	       initialize_Cp();
                cimg_forXY(PP,x,y)
 	       {
+		 if(DP(x,y)>0)
+		   //cout<<"DP("<<x<<","<<y<<") = "<<DP(x,y)<<endl;
+		 if (DP(x,y)==0)
+		   DP(x,y)=0.003;
                     //PP(x,y)=DP(x,y);
-                    PP(x,y)=CP(x,y);
-		    //PP(x,y)=DP(x,y)*CP(x,y)/pow(256,3);//TODO pb calcul DP & normalisation
+                    //PP(x,y)=CP(x,y);
+		    PP(x,y)=DP(x,y)*CP(x,y);//TODO pb calcul DP & normalisation
 		  
 	       }
           }
 	  
-	  void update_Cp(const int & IPS,const int & JPS,const double & Cprec)
+          void update_Pp(double _IPS,double _JPS,double _Cprec)
+          {
+               PP.fill(0.0);
+	       initialize_Cp();
+               //update_Cp(_IPS,_JPS,_Cprec);//TODO: à utiliser normalement!
+               calculate_Dp();
+               cimg_forXY(PP,x,y)
+	       {
+		  if (DP(x,y)==0)
+		   DP(x,y)=0.003;
+		  if((DP(x,y)<0)||(DP(x,y)>1))
+		    cout<<"error normalisation DP ="<<DP(x,y)<<endl;
+		  if((CP(x,y)<0)||(CP(x,y)>1))
+		    cout<<"error normalisation CP ="<<CP(x,y)<<endl;
+                    //PP(x,y)=DP(x,y);
+                    //PP(x,y)=CP(x,y);
+		    PP(x,y)=DP(x,y)*CP(x,y);//TODO pb calcul DP & normalisation
+		    
+		    //if (PP(x,y)!=0)
+			//cout<<"DP,CP "<<DP(x,y)<<" "<<CP(x,y)<<endl;	
+	       }
+          }
+	  
+
+	  
+	  void update_Cp(const int & IPS,const int & JPS,const double & Cprec)//TODO à revoir... 
 	  {
-	        int i=floor(size_patch/2);
+	       int i=floor(size_patch/2);
 	       for(int z=-i-1;z<i+2;z++)
 	       {
 		    for(int t=-i-1;t<i+2;t++)
@@ -188,14 +200,14 @@ class Pima
 	       {
 		    if(fill_front(x,y)!=0)
 		    {
-			 npx=fill_front(x-1,y-1)+2*fill_front(x-1,y)+fill_front(x-1,y+1)-
-			     fill_front(x+1,y-1)-2*fill_front(x+1,y)-fill_front(x+1,y+1);
+			 npx=target_region(x-1,y-1)+2*target_region(x-1,y)+target_region(x-1,y+1)-
+			     target_region(x+1,y-1)-2*target_region(x+1,y)-target_region(x+1,y+1);
 			     
-			 npy=fill_front(x-1,y-1)+2*fill_front(x,y-1)+fill_front(x+1,y-1)-
-			     fill_front(x-1,y+1)-2*fill_front(x,y+1)-fill_front(x+1,y+1);
+			 npy=target_region(x-1,y-1)+2*target_region(x,y-1)+target_region(x+1,y-1)-
+			     target_region(x-1,y+1)-2*target_region(x,y+1)-target_region(x+1,y+1);
 			     
-			 //npx/=4;
-			 //npy/=4;
+			 npx/=4.0;
+			 npy/=4.0;
 			      
 			 for(int z=-1;z<2;z++)
 			 {
@@ -210,8 +222,9 @@ class Pima
 				   }
 			      }
 			 }
-			 //mean[0]/=(cpt*256);mean[1]/=(cpt*256);mean[2]/=(cpt*256);
+			 mean[0]/=cpt;mean[1]/=cpt;mean[2]/=cpt;
 			
+			 //RED
 			 gradYI[0] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,0) : mean[0]) 
 			          +2*((source_region(x-1,y)!=0)   ? srcToFillRGB(x-1,y,0)   : mean[0])
 			           + ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,0) : mean[0])
@@ -219,14 +232,14 @@ class Pima
 			          -2*((source_region(x+1,y)!=0)   ? srcToFillRGB(x+1,y,0)   : mean[0])     
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,0) : mean[0]);
 			     
-			 gradXI[0]=  ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,0) : mean[0])
+			 gradXI[0] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,0) : mean[0])
 				  +2*((source_region(x,y-1)!=0)   ? srcToFillRGB(x,y-1,0)   : mean[0])
 			           + ((source_region(x+1,y-1)!=0) ? srcToFillRGB(x+1,y-1,0) : mean[0]) 
 			           - ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,0) : mean[0])
 			          -2*((source_region(x,y+1)!=0)   ? srcToFillRGB(x,y+1,0)   : mean[0])
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,0) : mean[0]);
 				   
-				   
+			//GREEN   
 			 gradYI[1] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,1) : mean[1]) 
 			          +2*((source_region(x-1,y)!=0)   ? srcToFillRGB(x-1,y,1)   : mean[1])
 			           + ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,1) : mean[1])
@@ -234,14 +247,14 @@ class Pima
 			          -2*((source_region(x+1,y)!=0)   ? srcToFillRGB(x+1,y,1)   : mean[1])     
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,1) : mean[1]);
 			     
-			 gradXI[1]=  ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,1) : mean[1])
+			 gradXI[1] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,1) : mean[1])
 				  +2*((source_region(x,y-1)!=0)   ? srcToFillRGB(x,y-1,1)   : mean[1])
 			            +((source_region(x+1,y-1)!=0) ? srcToFillRGB(x+1,y-1,1) : mean[1]) 
 			           - ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,1) : mean[1])
 			          -2*((source_region(x,y+1)!=0)   ? srcToFillRGB(x,y+1,1)   : mean[1])
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,1) : mean[1]);
 				   
-				   
+			//BLUE
 		         gradYI[2] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,2) : mean[2]) 
 			          +2*((source_region(x-1,y)!=0)   ? srcToFillRGB(x-1,y,2)   : mean[2])
 			           + ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,2) : mean[2])
@@ -249,24 +262,24 @@ class Pima
 			          -2*((source_region(x+1,y)!=0)   ? srcToFillRGB(x+1,y,2)   : mean[2])     
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,2) : mean[2]);
 			     
-			 gradXI[2]=  ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,2) : mean[2])
+			 gradXI[2] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,2) : mean[2])
 				  +2*((source_region(x,y-1)!=0)   ? srcToFillRGB(x,y-1,2)   : mean[2])
 			           + ((source_region(x+1,y-1)!=0) ? srcToFillRGB(x+1,y-1,2) : mean[2]) 
 			           - ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,2) : mean[2])
 			          -2*((source_region(x,y+1)!=0)   ? srcToFillRGB(x,y+1,2)   : mean[2])
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,2) : mean[2]);
 				   
-
-			 //gradXI[0]/=1024;gradXI[1]/=1024;gradXI[2]/=1024;//TODO pb normalisation
-			 //gradYI[0]/=1024;gradYI[1]/=1024;gradYI[2]/=1024;
 			 
-			 gradXI[0]=-gradXI[0];gradXI[1]=-gradXI[1];gradXI[2]=-gradXI[2];
-			      
+			 gradXI[0]/=-1020;gradXI[1]/=-1020;gradXI[2]/=-1020;//TODO pb normalisation ?
+			 gradYI[0]/=1020;gradYI[1]/=1020;gradYI[2]/=1020;
+			  
 			 DP(x,y)=abs(gradXI[0]*npx+gradXI[1]*npx+gradXI[2]*npx
-				    +gradYI[0]*npy+gradYI[1]*npy+gradYI[2]*npy);
+			 	    +gradYI[0]*npy+gradYI[1]*npy+gradYI[2]*npy)/2.0;
+				    
 		    }
 	       }
           }
+	  
           
           double get_maxPatch(int *x,int *y)
           {
@@ -286,7 +299,7 @@ class Pima
           
           void find_exemplar_Patch(int IPS,int JPS,int * IS, int *JS)
           {
-               double TMP(0.0), SSD(1.0);
+               double TMP(0.0), SSD(10000.0);
                int f=floor(size_patch/2);
 	       bool ok=true;
                cimg_forXY(source_region,a,b)
@@ -325,7 +338,7 @@ class Pima
                for(int z=-f;z<f+1;z++)
 	       {
                     for(int t=-f;t<f+1;t++)
-                         if ((target_region(i+t,j+z)==0) && (source_region(ii+t,jj+z)!=0)) //inutile pour l'instant
+                         if ((target_region(i+t,j+z)==0) )//&& (source_region(ii+t,jj+z)!=0)) //inutile pour l'instant
 			 {
 			      
 			      cpt++;
@@ -344,7 +357,7 @@ class Pima
 			      
 			 }
 	       }
-	       return res;//(62800*cpt);//TODO: pb de normalisation
+	       return res/(double)cpt;//TODO: pb de normalisation
           }
 	  
 	            
@@ -397,9 +410,11 @@ class Pima
                CImgDisplay 
 	       //main_disp1_0(srcFullRGB , "Image full"),
                main_disp1_1(srcToFillRGB , "Image source to fill"),
-               main_disp1_3(target_region , "Target Region"),
-               main_disp1_4(source_region , "Source Region"),
-               main_disp1_5(fill_front    , "Fill Front"),
+               //main_disp1_3(target_region , "Target Region"),
+               //main_disp1_4(source_region , "Source Region"),
+               //main_disp1_5(fill_front    , "Fill Front"),
+	       main_disp1_7(CP            , "CP"),
+	       main_disp1_8(DP            , "DP"),
                main_disp1_6(PP            , "PP");
                
                while (!main_disp1_1.button() && !main_disp1_1.is_closed()) {main_disp1_1.wait();} 
