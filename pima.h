@@ -21,7 +21,9 @@ class Pima
           double size_patch;
           double alpha;
 	  
-	 
+	  unsigned long int nb_points;
+	  
+	  
      public:
 
           Pima() : srcFullRGB(),srcToFillRGB() {}
@@ -42,6 +44,8 @@ class Pima
                CImg<bool> tmp5(W,H,1);
                tmp5.fill(0);
 	       
+	       nb_points=0;
+	       
 	       target_region=tmp3;
 	       source_region=tmp3;
 	       fill_front=tmp3;
@@ -54,13 +58,19 @@ class Pima
                alpha=_alpha;
                
                srcToFillCIE=srcToFillRGB.get_RGBtoLab();
+	       
+	       //force size_patch to be odd
+	       if (((int)size_patch%2)==0) size_patch+=1.0;
 
                //Initialisation of target_region
 	       cimg_forXY(srcFullRGB,g,h){
 			 if ((srcFullRGB(g,h,0)!=srcToFillRGB(g,h,0))||
 			     (srcFullRGB(g,h,1)!=srcToFillRGB(g,h,1))||
 			     (srcFullRGB(g,h,2)!=srcToFillRGB(g,h,2)))
+			 {
 			      target_region(g,h)=1;
+			      nb_points++;
+			 }
 	       }
 	       
                CP=tmp4;DP=tmp4;PP=tmp4;
@@ -81,6 +91,7 @@ class Pima
 
           void run()
           {
+	     
                int IPS(0),JPS(0),IS(0),JS(0);
                CImg<unsigned char> SRC_prec(srcToFillRGB);
                SRC_prec.fill(0.0);
@@ -89,22 +100,30 @@ class Pima
 	       double Cprec(0.0);
 	       //unsigned char red[]={255,0,0};
 	       //unsigned char blue[]={0,0,255};
+	       unsigned int cpt(0);
                while(SRC_prec!=srcToFillRGB)
 	       {	
+		    cpt++;
                     Cprec=get_maxPatch(&IPS,&JPS);
 		    srcToFillCIE=srcToFillRGB.get_RGBtoLab();
                     find_exemplar_Patch(IPS,JPS,&IS,&JS);
                     SRC_prec=srcToFillRGB;
                     fill_patch(IPS,JPS,IS,JS);//update srcToFillRGB
-		    
+		   
                     update_targetregion(&SRC_prec);
                     update_fillfront();
                     update_sourceregion();
+		    //srcFullCIE=srcToFillRGB.get_RGBtoLab();
 		    update_Pp(IPS,JPS,Cprec);
                     
 		    //srcToFillRGB.draw_circle(IPS,JPS,10,blue,1,1);
 		    //srcToFillRGB.draw_circle(IS,JS,10,red,1,1);
-		    //my_display();
+		    if (cpt%20==0)
+		    {
+		    
+		     my_display();
+		     //cout<<"nombre de pixels restant : "<<nb_points<<endl;
+		    }
                     
               }
               //srcToFillRGB=srcToFillCIE.get_LabtoRGB();
@@ -118,10 +137,9 @@ class Pima
 	       initialize_Cp();
                cimg_forXY(PP,x,y)
 	       {
-		 if(DP(x,y)>0)
+		 //if(DP(x,y)>0)
 		   //cout<<"DP("<<x<<","<<y<<") = "<<DP(x,y)<<endl;
-		 if (DP(x,y)==0)
-		   DP(x,y)=0.003;
+		 
                     //PP(x,y)=DP(x,y);
                     //PP(x,y)=CP(x,y);
 		    PP(x,y)=DP(x,y)*CP(x,y);//TODO pb calcul DP & normalisation
@@ -137,22 +155,38 @@ class Pima
                calculate_Dp();
                cimg_forXY(PP,x,y)
 	       {
-		  if (DP(x,y)==0)
-		   DP(x,y)=0.003;
 		  if((DP(x,y)<0)||(DP(x,y)>1))
 		    cout<<"error normalisation DP ="<<DP(x,y)<<endl;
 		  if((CP(x,y)<0)||(CP(x,y)>1))
 		    cout<<"error normalisation CP ="<<CP(x,y)<<endl;
                     //PP(x,y)=DP(x,y);
                     //PP(x,y)=CP(x,y);
-		    PP(x,y)=DP(x,y)*CP(x,y);//TODO pb calcul DP & normalisation
+		    PP(x,y)=DP(x,y)*CP(x,y);
 		    
 		    //if (PP(x,y)!=0)
 			//cout<<"DP,CP "<<DP(x,y)<<" "<<CP(x,y)<<endl;	
 	       }
           }
 	  
-
+	  
+          void initialize_Cp()
+          {
+               int i=floor(size_patch/2);
+               CP.fill(0.0);
+	       double cpt(0.0);
+               cimg_forXY(fill_front,x,y)
+                    if (fill_front(x,y)!=0)
+                    { 
+                         for(int z=-i;z<i+1;z++)
+			 {
+                              for(int t=-i;t<i+1;t++)
+                                   if (target_region(x+z,y+t)==0)
+                                        cpt+=1.0;
+			 }
+			 CP(x,y)=cpt/((double)size_patch*(double)size_patch);//TODO pb normalisation
+			 cpt=0.0;
+                    }
+          }
 	  
 	  void update_Cp(const int & IPS,const int & JPS,const double & Cprec)//TODO à revoir... 
 	  {
@@ -168,34 +202,13 @@ class Pima
 		    }
 	       }
 	  }
-          
-          void initialize_Cp()
-          {
-               int i=floor(size_patch/2);
-               CP.fill(0.0);
-	       double cpt(0.0);
-               cimg_forXY(fill_front,x,y)
-                    if (fill_front(x,y)!=0)
-                    { 
-                         for(int z=-i;z<i+1;z++)
-			 {
-                              for(int t=-i;t<i+1;t++)
-                                   if (target_region(x+z,y+t)==0)
-                                        cpt++;
-			 }
-			 CP(x,y)=cpt/pow(size_patch,2);//TODO pb normalisation
-			 cpt=0.0;
-			 //cout<<"CP(x,y) = "<<CP(x,y)<<endl;
-                    }
-          }
-	 
                   
           void calculate_Dp() 
 	  {
 	      
 	       double gradXI[3]={0,0,0},gradYI[3]={0,0,0},npx(0),npy(0), mean[3]={0,0,0};
 	       double cpt(0);
-	       DP.fill(0);
+	       DP.fill(0.00);
 	       cimg_forXY(fill_front,x,y)
 	       {
 		    if(fill_front(x,y)!=0)
@@ -208,12 +221,13 @@ class Pima
 			     
 			 npx/=4.0;
 			 npy/=4.0;
-			      
+			 cpt=0.0;     
 			 for(int z=-1;z<2;z++)
 			 {
                               for(int t=-1;t<2;t++)
 			      {
-				   if (source_region(x+t,y+z)!=0)
+				   //if (source_region(x+t,y+z)!=0)
+				   if (target_region(x+t,y+z)==0)
 				   {
 					mean[0]+=srcToFillRGB(x+t,y+z,0);
 					mean[1]+=srcToFillRGB(x+t,y+z,1);
@@ -223,8 +237,54 @@ class Pima
 			      }
 			 }
 			 mean[0]/=cpt;mean[1]/=cpt;mean[2]/=cpt;
-			
 			 //RED
+			 
+			 
+			 gradYI[0] = ((target_region(x-1,y-1)==0) ? srcToFillRGB(x-1,y-1,0) : mean[0]) 
+			          +2*((target_region(x-1,y)==0)   ? srcToFillRGB(x-1,y,0)   : mean[0])
+			           + ((target_region(x-1,y+1)==0) ? srcToFillRGB(x-1,y+1,0) : mean[0])
+			           - ((target_region(x+1,y-1)==0) ? srcToFillRGB(x+1,y-1,0) : mean[0])
+			          -2*((target_region(x+1,y)==0)   ? srcToFillRGB(x+1,y,0)   : mean[0])     
+			           - ((target_region(x+1,y+1)==0) ? srcToFillRGB(x+1,y+1,0) : mean[0]);
+				   
+			 gradXI[0] = ((target_region(x-1,y-1)==0) ? srcToFillRGB(x-1,y-1,0) : mean[0])
+				  +2*((target_region(x,y-1)==0)   ? srcToFillRGB(x,y-1,0)   : mean[0])
+			           + ((target_region(x+1,y-1)==0) ? srcToFillRGB(x+1,y-1,0) : mean[0]) 
+			           - ((target_region(x-1,y+1)==0) ? srcToFillRGB(x-1,y+1,0) : mean[0])
+			          -2*((target_region(x,y+1)==0)   ? srcToFillRGB(x,y+1,0)   : mean[0])
+			           - ((target_region(x+1,y+1)==0) ? srcToFillRGB(x+1,y+1,0) : mean[0]);
+				   
+			//GREEN   
+			 gradYI[1] = ((target_region(x-1,y-1)==0) ? srcToFillRGB(x-1,y-1,1) : mean[1]) 
+			          +2*((target_region(x-1,y)==0)   ? srcToFillRGB(x-1,y,1)   : mean[1])
+			           + ((target_region(x-1,y+1)==0) ? srcToFillRGB(x-1,y+1,1) : mean[1])
+			           - ((target_region(x+1,y-1)==0) ? srcToFillRGB(x+1,y-1,1) : mean[1])
+			          -2*((target_region(x+1,y)==0)   ? srcToFillRGB(x+1,y,1)   : mean[1])     
+			           - ((target_region(x+1,y+1)==0) ? srcToFillRGB(x+1,y+1,1) : mean[1]);
+			     
+			 gradXI[1] = ((target_region(x-1,y-1)==0) ? srcToFillRGB(x-1,y-1,1) : mean[1])
+				  +2*((target_region(x,y-1)==0)   ? srcToFillRGB(x,y-1,1)   : mean[1])
+			            +((target_region(x+1,y-1)==0) ? srcToFillRGB(x+1,y-1,1) : mean[1]) 
+			           - ((target_region(x-1,y+1)==0) ? srcToFillRGB(x-1,y+1,1) : mean[1])
+			          -2*((target_region(x,y+1)==0)   ? srcToFillRGB(x,y+1,1)   : mean[1])
+			           - ((target_region(x+1,y+1)==0) ? srcToFillRGB(x+1,y+1,1) : mean[1]);
+				   
+			//BLUE
+		         gradYI[2] = ((target_region(x-1,y-1)==0) ? srcToFillRGB(x-1,y-1,2) : mean[2]) 
+			          +2*((target_region(x-1,y)==0)   ? srcToFillRGB(x-1,y,2)   : mean[2])
+			           + ((target_region(x-1,y+1)==0) ? srcToFillRGB(x-1,y+1,2) : mean[2])
+			           - ((target_region(x+1,y-1)==0) ? srcToFillRGB(x+1,y-1,2) : mean[2])
+			          -2*((target_region(x+1,y)==0)   ? srcToFillRGB(x+1,y,2)   : mean[2])     
+			           - ((target_region(x+1,y+1)==0) ? srcToFillRGB(x+1,y+1,2) : mean[2]);
+			     
+			 gradXI[2] = ((target_region(x-1,y-1)==0) ? srcToFillRGB(x-1,y-1,2) : mean[2])
+				  +2*((target_region(x,y-1)==0)   ? srcToFillRGB(x,y-1,2)   : mean[2])
+			           + ((target_region(x+1,y-1)==0) ? srcToFillRGB(x+1,y-1,2) : mean[2]) 
+			           - ((target_region(x-1,y+1)==0) ? srcToFillRGB(x-1,y+1,2) : mean[2])
+			          -2*((target_region(x,y+1)==0)   ? srcToFillRGB(x,y+1,2)   : mean[2])
+			           - ((target_region(x+1,y+1)==0) ? srcToFillRGB(x+1,y+1,2) : mean[2]);
+			     
+			 /*
 			 gradYI[0] = ((source_region(x-1,y-1)!=0) ? srcToFillRGB(x-1,y-1,0) : mean[0]) 
 			          +2*((source_region(x-1,y)!=0)   ? srcToFillRGB(x-1,y,0)   : mean[0])
 			           + ((source_region(x-1,y+1)!=0) ? srcToFillRGB(x-1,y+1,0) : mean[0])
@@ -269,16 +329,110 @@ class Pima
 			          -2*((source_region(x,y+1)!=0)   ? srcToFillRGB(x,y+1,2)   : mean[2])
 			           - ((source_region(x+1,y+1)!=0) ? srcToFillRGB(x+1,y+1,2) : mean[2]);
 				   
-			 
-			 gradXI[0]/=-1020;gradXI[1]/=-1020;gradXI[2]/=-1020;//TODO pb normalisation ?
-			 gradYI[0]/=1020;gradYI[1]/=1020;gradYI[2]/=1020;
+			 */
+			 gradXI[0]/=-1020.0;gradXI[1]/=-1020.0;gradXI[2]/=-1020.0;
+			 gradYI[0]/=1020.0;gradYI[1]/=1020.0;gradYI[2]/=1020.0;
 			  
 			 DP(x,y)=abs(gradXI[0]*npx+gradXI[1]*npx+gradXI[2]*npx
-			 	    +gradYI[0]*npy+gradYI[1]*npy+gradYI[2]*npy)/2.0;
+			 	    +gradYI[0]*npy+gradYI[1]*npy+gradYI[2]*npy)/3.0+0.01;
 				    
 		    }
 	       }
           }
+	  
+	   void calculate_Dp2() 
+	  {
+	      
+	       double gradXI[3]={0,0,0},gradYI[3]={0,0,0},npx(0),npy(0), mean[3]={0,0,0};
+	       double cpt(0);
+	       DP.fill(0.00);
+	       cimg_forXY(fill_front,x,y)
+	       {
+		    if(fill_front(x,y)!=0)
+		    {
+			 npx=target_region(x-1,y-1)+2*target_region(x-1,y)+target_region(x-1,y+1)-
+			     target_region(x+1,y-1)-2*target_region(x+1,y)-target_region(x+1,y+1);
+			     
+			 npy=target_region(x-1,y-1)+2*target_region(x,y-1)+target_region(x+1,y-1)-
+			     target_region(x-1,y+1)-2*target_region(x,y+1)-target_region(x+1,y+1);
+			     
+			 npx/=4.0;
+			 npy/=4.0;
+			 cpt=0.0;     
+			 for(int z=-1;z<2;z++)
+			 {
+                              for(int t=-1;t<2;t++)
+			      {
+				   //if (source_region(x+t,y+z)!=0)
+				   if (target_region(x+t,y+z)==0)
+				   {
+					mean[0]+=srcToFillCIE(x+t,y+z,0);
+					//mean[1]+=srcToFillCIE(x+t,y+z,1);
+					//mean[2]+=srcToFillCIE(x+t,y+z,2);
+					cpt++;
+				   }
+			      }
+			 }
+			 mean[0]/=cpt;mean[1]/=cpt;mean[2]/=cpt;
+			 //RED
+			 
+			 
+			 gradYI[0] = ((target_region(x-1,y-1)==0) ? srcToFillCIE(x-1,y-1,0) : mean[0]) 
+			          +2*((target_region(x-1,y)==0)   ? srcToFillCIE(x-1,y,0)   : mean[0])
+			           + ((target_region(x-1,y+1)==0) ? srcToFillCIE(x-1,y+1,0) : mean[0])
+			           - ((target_region(x+1,y-1)==0) ? srcToFillCIE(x+1,y-1,0) : mean[0])
+			          -2*((target_region(x+1,y)==0)   ? srcToFillCIE(x+1,y,0)   : mean[0])     
+			           - ((target_region(x+1,y+1)==0) ? srcToFillCIE(x+1,y+1,0) : mean[0]);
+				   
+			 gradXI[0] = ((target_region(x-1,y-1)==0) ? srcToFillCIE(x-1,y-1,0) : mean[0])
+				  +2*((target_region(x,y-1)==0)   ? srcToFillCIE(x,y-1,0)   : mean[0])
+			           + ((target_region(x+1,y-1)==0) ? srcToFillCIE(x+1,y-1,0) : mean[0]) 
+			           - ((target_region(x-1,y+1)==0) ? srcToFillCIE(x-1,y+1,0) : mean[0])
+			          -2*((target_region(x,y+1)==0)   ? srcToFillCIE(x,y+1,0)   : mean[0])
+			           - ((target_region(x+1,y+1)==0) ? srcToFillCIE(x+1,y+1,0) : mean[0]);
+				   
+			//GREEN   
+			 gradYI[1] = ((target_region(x-1,y-1)==0) ? srcToFillCIE(x-1,y-1,1) : mean[1]) 
+			          +2*((target_region(x-1,y)==0)   ? srcToFillCIE(x-1,y,1)   : mean[1])
+			           + ((target_region(x-1,y+1)==0) ? srcToFillCIE(x-1,y+1,1) : mean[1])
+			           - ((target_region(x+1,y-1)==0) ? srcToFillCIE(x+1,y-1,1) : mean[1])
+			          -2*((target_region(x+1,y)==0)   ? srcToFillCIE(x+1,y,1)   : mean[1])     
+			           - ((target_region(x+1,y+1)==0) ? srcToFillCIE(x+1,y+1,1) : mean[1]);
+			     
+			 gradXI[1] = ((target_region(x-1,y-1)==0) ? srcToFillCIE(x-1,y-1,1) : mean[1])
+				  +2*((target_region(x,y-1)==0)   ? srcToFillCIE(x,y-1,1)   : mean[1])
+			            +((target_region(x+1,y-1)==0) ? srcToFillCIE(x+1,y-1,1) : mean[1]) 
+			           - ((target_region(x-1,y+1)==0) ? srcToFillCIE(x-1,y+1,1) : mean[1])
+			          -2*((target_region(x,y+1)==0)   ? srcToFillCIE(x,y+1,1)   : mean[1])
+			           - ((target_region(x+1,y+1)==0) ? srcToFillCIE(x+1,y+1,1) : mean[1]);
+				   
+			//BLUE
+		         gradYI[2] = ((target_region(x-1,y-1)==0) ? srcToFillCIE(x-1,y-1,2) : mean[2]) 
+			          +2*((target_region(x-1,y)==0)   ? srcToFillCIE(x-1,y,2)   : mean[2])
+			           + ((target_region(x-1,y+1)==0) ? srcToFillCIE(x-1,y+1,2) : mean[2])
+			           - ((target_region(x+1,y-1)==0) ? srcToFillCIE(x+1,y-1,2) : mean[2])
+			          -2*((target_region(x+1,y)==0)   ? srcToFillCIE(x+1,y,2)   : mean[2])     
+			           - ((target_region(x+1,y+1)==0) ? srcToFillCIE(x+1,y+1,2) : mean[2]);
+			     
+			 gradXI[2] = ((target_region(x-1,y-1)==0) ? srcToFillCIE(x-1,y-1,2) : mean[2])
+				  +2*((target_region(x,y-1)==0)   ? srcToFillCIE(x,y-1,2)   : mean[2])
+			           + ((target_region(x+1,y-1)==0) ? srcToFillCIE(x+1,y-1,2) : mean[2]) 
+			           - ((target_region(x-1,y+1)==0) ? srcToFillCIE(x-1,y+1,2) : mean[2])
+			          -2*((target_region(x,y+1)==0)   ? srcToFillCIE(x,y+1,2)   : mean[2])
+			           - ((target_region(x+1,y+1)==0) ? srcToFillCIE(x+1,y+1,2) : mean[2]);
+			     
+			
+			 gradXI[0]/=-400.0;gradXI[1]/=-960.0;gradXI[2]/=-960.0;
+			 gradYI[0]/=400.0;gradYI[1]/=960.0;gradYI[2]/=960.0;
+			  
+			 //DP(x,y)=abs(gradXI[0]*npx+gradXI[1]*npx+gradXI[2]*npx
+			 //	   +gradYI[0]*npy+gradYI[1]*npy+gradYI[2]*npy)/3.0+0.001;
+			 DP(x,y)=abs(gradXI[0]*npx+gradYI[0]*npy)+0.001;
+				    
+		    }
+	       }
+          }
+	  
 	  
           
           double get_maxPatch(int *x,int *y)
@@ -286,20 +440,21 @@ class Pima
                double tmp(-1.0);
                cimg_forXY(PP,a,b)
 	       {
-                    if ( (fill_front(a,b) != 0) && (PP(a,b)>tmp))
+                    if ( (fill_front(a,b) != 0) && (PP(a,b)>=tmp))
                     {
                          tmp=PP(a,b);
                          *x=a;
                          *y=b;
                     }
 	       }
+	       //cout<<"PP(a,b) = "<<PP(*x,*y)<<endl;
 	       return CP(*x,*y);
           }
 
           
           void find_exemplar_Patch(int IPS,int JPS,int * IS, int *JS)
           {
-               double TMP(0.0), SSD(10000.0);
+               double TMP(0.0), SSD(1e10);
                int f=floor(size_patch/2);
 	       bool ok=true;
                cimg_forXY(source_region,a,b)
@@ -322,27 +477,26 @@ class Pima
 			 }
                     }
                }
+	       
 	       //cout<<"SSD = "<<SSD<<endl;
-	       //cout<<"a-b = "<<IPS<<" "<<JPS<<endl;
-	       //cout<<"a-b = "<<*IS<<" "<<*JS<<endl;
+	       //cout<<"patch elected px,py = "<<IPS<<" "<<JPS<<endl;
+	       //cout<<"patch source  sx-sy = "<<*IS<<" "<<*JS<<endl;
 	       
           }
           
           //(i,j) coordonates of the center of the patch to fill
           //(ii,jj) coordonates of the center of the patch to find in the source_region
-          float compare_patch(const int i,const int j,const int ii,const int jj)
+          double compare_patch(const int i,const int j,const int ii,const int jj)
           {
                double res(0.0);
                int f=floor(size_patch/2);
-	       int cpt(0);
+	       unsigned int cpt(0);
                for(int z=-f;z<f+1;z++)
 	       {
                     for(int t=-f;t<f+1;t++)
-                         if ((target_region(i+t,j+z)==0) )//&& (source_region(ii+t,jj+z)!=0)) //inutile pour l'instant
+                         if (target_region(i+t,j+z)==0)
 			 {
-			      
 			      cpt++;
-			      
 			      res+=pow(srcToFillCIE(i+t,j+z,0)-srcToFillCIE(ii+t,jj+z,0),2)+
 				   pow(srcToFillCIE(i+t,j+z,1)-srcToFillCIE(ii+t,jj+z,1),2)+
 				   pow(srcToFillCIE(i+t,j+z,2)-srcToFillCIE(ii+t,jj+z,2),2);
@@ -377,8 +531,9 @@ class Pima
 			 }
           }
 	  
-          void update_targetregion(CImg<unsigned char>  *Prec)
+          void update_targetregion(CImg<unsigned char>  *Prec)//TODO: optimized
           {
+		
 	       CImg<bool> tmp(target_region);
 	       tmp.fill(0);
 	       cimg_forXY(srcToFillRGB,g,h)
@@ -388,12 +543,15 @@ class Pima
 			      ((*Prec)(g,h,2)!=srcToFillRGB(g,h,2))  )
 			 {
 			      tmp(g,h)=1;
+			      nb_points--;
 			 }
 	       }
                target_region-=tmp;
+	       
+	       
           }
 	  
-          void update_fillfront()
+          void update_fillfront()//TODO: optimized
           {
                CImg<bool> tmp(target_region);
                fill_front=(target_region-tmp.erode(3,3));
@@ -412,9 +570,9 @@ class Pima
                main_disp1_1(srcToFillRGB , "Image source to fill"),
                //main_disp1_3(target_region , "Target Region"),
                //main_disp1_4(source_region , "Source Region"),
-               //main_disp1_5(fill_front    , "Fill Front"),
-	       main_disp1_7(CP            , "CP"),
-	       main_disp1_8(DP            , "DP"),
+               //main_disp1_5(fill_front    , "Fill Front");
+	       //main_disp1_7(CP            , "CP"),
+	       //main_disp1_8(DP            , "DP"),
                main_disp1_6(PP            , "PP");
                
                while (!main_disp1_1.button() && !main_disp1_1.is_closed()) {main_disp1_1.wait();} 
