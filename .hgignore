@@ -1,0 +1,5 @@
+syntax: glob
+_CImg/*
+_images/*
+CImg.h
+README.txt
