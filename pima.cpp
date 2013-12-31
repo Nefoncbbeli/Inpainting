@@ -1,9 +1,15 @@
 #include "pima.h"
 
 
-Pima::Pima(const char * _srcFullRGB,const char * _srcToFillRGB, int _size_dilate,
-	 double _size_patch,float _reduction_influence, double _epsilon) : 
-srcFullRGB(), srcToFillRGB(), size_dilate(), size_patch(), reduction_influence(), epsilon() //constructeur
+Pima::Pima(
+	const char * _srcFullRGB
+,	const char * _srcToFillRGB
+,	const char * _outputName
+,	int _size_dilate
+,	double _size_patch
+,	float _reduction_influence
+,	double _epsilon) :	
+srcFullRGB(), srcToFillRGB(), outputName(), size_dilate(), size_patch(), reduction_influence(), epsilon() //constructeur
 {     
   
   //initialisation 
@@ -22,10 +28,11 @@ srcFullRGB(), srcToFillRGB(), size_dilate(), size_patch(), reduction_influence()
   source_region=tmp3;
   fill_front=tmp3;
   
-  srcFullRGB=tmp1;
-  srcToFillRGB=tmp2;
-  size_dilate=_size_dilate;
-  size_patch=_size_patch;
+  srcFullRGB   = tmp1;
+  srcToFillRGB = tmp2;
+  size_dilate  = _size_dilate;
+  size_patch   = _size_patch;
+  outputName   = _outputName;
   
   srcToFillCIE=srcToFillRGB.get_RGBtoLab();
   
@@ -57,10 +64,10 @@ srcFullRGB(), srcToFillRGB(), size_dilate(), size_patch(), reduction_influence()
   fill_front=target_region-tmp5.erode(3,3);
   
   //ALGORITHME
-  run();
+  run(outputName);
 }
 
-void Pima::run()
+void Pima::run(const char * outputName)
 {
   unsigned int IPS(0),JPS(0),IS(0),JS(0),cpt(0);
   double Cprec(0.0);
@@ -88,7 +95,11 @@ void Pima::run()
     }
   }
   my_display(cpt);
-  srcToFillRGB.save("Resultat.ppm",-1);
+  /*cout<<"ouputName : ";
+  cout<<outputName;
+  cout<<"";*/
+  cout << "ouputName : " <<outputName<<"\n";
+  srcToFillRGB.save(outputName, -1);
 }
     
     

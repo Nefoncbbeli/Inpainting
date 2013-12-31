@@ -34,12 +34,12 @@ main.o: main.cpp
 
 clean:
 	@rm -rf *.o
-
+	
 
 mrproper: clean
 	@rm -rf $(EXEC)
 	@rm -rf *~
-
+	
 
 
 
