@@ -88,17 +88,14 @@ void Pima::run(const char * outputName)
     update_fillfront();
     update_sourceregion();
     update_Pp(IPS,JPS,Cprec);
-    
+   
     if (cpt%20==0)
     {
 	 //my_display(cpt);   //Décommenter pour afficher le résultat toutes les 20 itérations!
     }
   }
   my_display(cpt);
-  /*cout<<"ouputName : ";
-  cout<<outputName;
-  cout<<"";*/
-  cout << "ouputName : " <<outputName<<"\n";
+  cout << "ouputName : " << outputName << "\n";
   srcToFillRGB.save(outputName, -1);
 }
     
