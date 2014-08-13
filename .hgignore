@@ -1,5 +1,6 @@
 syntax: glob
 
-CImg.h
+CImg-1.5.9/*
+Images/*
 *~                   # Emacs backup files
 *.txt                   # Emacs backup files

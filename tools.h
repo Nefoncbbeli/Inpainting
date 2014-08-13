@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
-#include "F:\HG\Inpainting\Criminisi_2004\CImg-1.5.9\CImg.h"
+#include "CImg.h"
+//#include "F:\HG\Inpainting\Criminisi_2004\CImg-1.5.9\CImg.h"
 
 
 using namespace cimg_library;
