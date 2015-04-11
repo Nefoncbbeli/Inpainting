@@ -427,6 +427,7 @@ void Pima::my_display(unsigned int cpt)
 {
 	if(cpt==0)
 		cout<<"Cliquez sur l'image pour lancer l'algorithme"<<endl;
+	//TODO : write in english !
 	CImgDisplay 
 		//main_disp1_0(srcFullRGB , "Image initiale"),
 		main_disp1_1(srcToFillRGB , "__Cliquez sur l'image__");
